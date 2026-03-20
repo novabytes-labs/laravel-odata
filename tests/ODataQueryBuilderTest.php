@@ -510,7 +510,7 @@ class ODataQueryBuilderTest extends TestCase
             . '&$select=Name,Price'
             . '&$expand=Category'
             . '&$orderby=Price desc'
-            . '&$top=3'
+            . '&$top=3',
         );
 
         $results = ODataQueryBuilder::for(Product::class, $request)

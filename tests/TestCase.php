@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace NovaBytes\OData\Laravel\Tests;
 
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use NovaBytes\OData\Laravel\ODataServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
