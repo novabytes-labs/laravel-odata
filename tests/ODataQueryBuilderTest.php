@@ -566,4 +566,277 @@ class ODataQueryBuilderTest extends TestCase
 
         $this->assertCount(2, $results);
     }
+
+    #[Test]
+    public function it_filters_with_endswith(): void
+    {
+        $request = $this->makeRequest('$filter=endswith(Name,\'se\')');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('name')
+            ->get();
+
+        $this->assertCount(1, $results);
+        $this->assertSame('Cheese', $results->first()->name);
+    }
+
+    #[Test]
+    public function it_filters_with_not_operator(): void
+    {
+        $request = $this->makeRequest('$filter=not contains(Name,\'Milk\')');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('name')
+            ->get();
+
+        $this->assertCount(4, $results);
+    }
+
+    /**
+     * Products with at least one review: Laptop (2), Phone (1), Milk (1).
+     */
+    #[Test]
+    public function it_filters_with_lambda_any_without_predicate(): void
+    {
+        $request = $this->makeRequest('$filter=Reviews/any()');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->get();
+
+        $this->assertCount(3, $results);
+    }
+
+    /**
+     * Products with at least one review rated above 4: Laptop (5), Milk (5).
+     */
+    #[Test]
+    public function it_filters_with_lambda_any_with_predicate(): void
+    {
+        $request = $this->makeRequest('$filter=Reviews/any(r: r/Rating gt 4)');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('rating', 'r.rating')
+            ->get();
+
+        $this->assertCount(2, $results);
+    }
+
+    /**
+     * Products where ALL reviews have rating > 3.
+     * Laptop (5,4), Milk (5), Cheese (none), OldWidget (none) match.
+     * Phone (3) does not — review rated 3 is not > 3.
+     */
+    #[Test]
+    public function it_filters_with_lambda_all(): void
+    {
+        $request = $this->makeRequest('$filter=Reviews/all(r: r/Rating gt 3)');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('rating', 'r.rating')
+            ->get();
+
+        $this->assertCount(4, $results);
+        $this->assertFalse($results->contains('name', 'Phone'));
+    }
+
+    /**
+     * Literal on the left side: 100 lt Price is equivalent to Price gt 100.
+     */
+    #[Test]
+    public function it_filters_with_literal_on_left_side(): void
+    {
+        $request = $this->makeRequest('$filter=100 lt Price');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('price')
+            ->get();
+
+        $this->assertCount(2, $results);
+    }
+
+    #[Test]
+    public function it_filters_with_function_compared_to_literal(): void
+    {
+        $request = $this->makeRequest('$filter=tolower(Name) eq \'milk\'');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('name')
+            ->get();
+
+        $this->assertCount(1, $results);
+        $this->assertSame('Milk', $results->first()->name);
+    }
+
+    #[Test]
+    public function it_filters_with_ne_operator(): void
+    {
+        $request = $this->makeRequest('$filter=Name ne \'Milk\'');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('name')
+            ->get();
+
+        $this->assertCount(4, $results);
+    }
+
+    #[Test]
+    public function it_filters_with_ge_operator(): void
+    {
+        $request = $this->makeRequest('$filter=Price ge 499.99');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('price')
+            ->get();
+
+        $this->assertCount(2, $results);
+    }
+
+    #[Test]
+    public function it_filters_with_le_operator(): void
+    {
+        $request = $this->makeRequest('$filter=Price le 5.49');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('price')
+            ->get();
+
+        $this->assertCount(3, $results);
+    }
+
+    #[Test]
+    public function it_filters_with_lt_operator(): void
+    {
+        $request = $this->makeRequest('$filter=Price lt 5');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('price')
+            ->get();
+
+        $this->assertCount(2, $results);
+    }
+
+    /**
+     * All seeded products have descriptions, so ne null returns all.
+     */
+    #[Test]
+    public function it_filters_ne_null(): void
+    {
+        $request = $this->makeRequest('$filter=Description ne null');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('description')
+            ->get();
+
+        $this->assertCount(5, $results);
+    }
+
+    #[Test]
+    public function it_expands_with_nested_select(): void
+    {
+        $request = $this->makeRequest('$expand=Reviews($select=Id,ProductId,Author,Rating)');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedExpands('reviews')
+            ->get();
+
+        $laptop = $results->firstWhere('name', 'Laptop');
+        $this->assertTrue($laptop->relationLoaded('reviews'));
+        $this->assertNotEmpty($laptop->reviews);
+        $this->assertNotNull($laptop->reviews->first()->author);
+        $this->assertNotNull($laptop->reviews->first()->rating);
+        $this->assertNull($laptop->reviews->first()->body);
+    }
+
+    #[Test]
+    public function it_expands_with_nested_orderby(): void
+    {
+        $request = $this->makeRequest('$expand=Reviews($orderby=Rating desc)');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedExpands('reviews')
+            ->allowedSorts('rating')
+            ->get();
+
+        $laptop = $results->firstWhere('name', 'Laptop');
+        $this->assertSame(5, $laptop->reviews->first()->rating);
+        $this->assertSame(4, $laptop->reviews->last()->rating);
+    }
+
+    #[Test]
+    public function it_expands_with_nested_skip(): void
+    {
+        $request = $this->makeRequest('$expand=Reviews($orderby=Rating asc;$skip=1;$top=10)');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedExpands('reviews')
+            ->allowedSorts('rating')
+            ->get();
+
+        $laptop = $results->firstWhere('name', 'Laptop');
+        $this->assertCount(1, $laptop->reviews);
+    }
+
+    #[Test]
+    public function it_skips_wildcard_expand(): void
+    {
+        $request = $this->makeRequest('$expand=*');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->get();
+
+        $this->assertCount(5, $results);
+        $this->assertFalse($results->first()->relationLoaded('category'));
+    }
+
+    #[Test]
+    public function it_applies_default_top_from_config(): void
+    {
+        $this->app['config']->set('odata.default_top', 3);
+
+        $request = $this->makeRequest('');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->get();
+
+        $this->assertCount(3, $results);
+    }
+
+    #[Test]
+    public function it_caps_top_silently_when_throw_disabled(): void
+    {
+        $this->app['config']->set('odata.max_top', 2);
+        $this->app['config']->set('odata.throw_on_invalid', false);
+
+        $request = $this->makeRequest('$top=100');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->get();
+
+        $this->assertCount(2, $results);
+    }
+
+    #[Test]
+    public function it_accepts_builder_instance(): void
+    {
+        $request = $this->makeRequest('$top=10');
+
+        $results = ODataQueryBuilder::for(Product::query()->where('is_active', true), $request)
+            ->get();
+
+        $this->assertCount(4, $results);
+    }
+
+    #[Test]
+    public function it_silently_ignores_invalid_expand(): void
+    {
+        $this->app['config']->set('odata.throw_on_invalid', false);
+
+        $request = $this->makeRequest('$expand=NonExistent');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedExpands('category')
+            ->get();
+
+        $this->assertCount(5, $results);
+    }
 }
