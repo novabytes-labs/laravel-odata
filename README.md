@@ -7,7 +7,7 @@
 
 Apply OData 4 query options to Eloquent models. Supports `$filter`, `$select`, `$expand`, `$orderby`, `$top`, `$skip`, and `$count`.
 
-Built on top of [novabytes/odata-query-parser](https://github.com/novabytes-labs/laravel-odata).
+Built on top of [novabytes/odata-query-parser](https://github.com/novabytes-labs/odata-query-parser).
 
 ## Installation
 
@@ -67,7 +67,7 @@ GET /products?$filter=Description eq null
 GET /products?$filter=Reviews/any(r:r/Rating gt 4)
 ```
 
-All OData comparison operators (`eq`, `ne`, `gt`, `ge`, `lt`, `le`), logical operators (`and`, `or`, `not`), and 30+ built-in functions are supported by the parser. See the [parser README](https://github.com/novabytes-labs/laravel-odata) for the full list.
+All OData comparison operators (`eq`, `ne`, `gt`, `ge`, `lt`, `le`), logical operators (`and`, `or`, `not`), and 30+ built-in functions are supported by the parser. See the [parser README](https://github.com/novabytes-labs/odata-query-parser) for the full list.
 
 ### Selecting (`$select`)
 
