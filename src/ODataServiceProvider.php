@@ -8,11 +8,17 @@ use Illuminate\Support\ServiceProvider;
 
 class ODataServiceProvider extends ServiceProvider
 {
+    /**
+     * Register the OData configuration file.
+     */
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/odata.php', 'odata');
     }
 
+    /**
+     * Publish the OData configuration file.
+     */
     public function boot(): void
     {
         $this->publishes([

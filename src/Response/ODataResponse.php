@@ -17,11 +17,17 @@ class ODataResponse implements Responsable, Arrayable
         private readonly string $format,
     ) {}
 
+    /**
+     * Convert the response to a JsonResponse.
+     */
     public function toResponse($request): JsonResponse
     {
         return new JsonResponse($this->toArray(), 200);
     }
 
+    /**
+     * Convert the response to an array using the configured format.
+     */
     public function toArray(): array
     {
         if ($this->format === 'odata') {
@@ -32,11 +38,12 @@ class ODataResponse implements Responsable, Arrayable
     }
 
     /**
-     * OData JSON format:
-     * {
-     *   "@odata.count": 100,
-     *   "value": [...],
-     *   "@odata.nextLink": "...?$skip=20&$top=10"
+     * Format the response as OData JSON.
+     *
+     * @return array{
+     *     @odata.count?: int,
+     *     value: array<int, mixed>,
+     *     @odata.nextLink?: string
      * }
      */
     private function toODataFormat(): array
@@ -57,7 +64,9 @@ class ODataResponse implements Responsable, Arrayable
     }
 
     /**
-     * Standard Laravel pagination format.
+     * Format the response as standard Laravel pagination.
+     *
+     * @return array{data: array<int, mixed>, meta?: array{total: int, per_page: int, current_page: int, last_page: int}}
      */
     private function toLaravelFormat(): array
     {
@@ -77,6 +86,9 @@ class ODataResponse implements Responsable, Arrayable
         return $result;
     }
 
+    /**
+     * Build the next page URL with OData $skip and $top parameters.
+     */
     private function buildNextLink(): string
     {
         $currentUrl = $this->paginator->path();
@@ -84,7 +96,6 @@ class ODataResponse implements Responsable, Arrayable
         $currentPage = $this->paginator->currentPage();
         $nextSkip = $currentPage * $perPage;
 
-        // Rebuild query string with OData parameters
         $params = request()->query();
         $params['$skip'] = $nextSkip;
         $params['$top'] = $perPage;
@@ -92,11 +103,17 @@ class ODataResponse implements Responsable, Arrayable
         return $currentUrl . '?' . http_build_query($params);
     }
 
+    /**
+     * Get the paginated items as a Collection.
+     */
     public function getCollection(): \Illuminate\Support\Collection
     {
         return collect($this->paginator->items());
     }
 
+    /**
+     * Get the total number of records.
+     */
     public function total(): int
     {
         return $this->paginator->total();

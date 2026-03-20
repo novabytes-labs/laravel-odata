@@ -14,6 +14,9 @@ use PHPUnit\Framework\Attributes\Test;
 
 class ODataQueryBuilderTest extends TestCase
 {
+    /**
+     * {@inheritdoc}
+     */
     protected function setUp(): void
     {
         parent::setUp();
@@ -21,6 +24,9 @@ class ODataQueryBuilderTest extends TestCase
         $this->seedDatabase();
     }
 
+    /**
+     * Seed the test database with categories, products, and reviews.
+     */
     private function seedDatabase(): void
     {
         $electronics = Category::create(['name' => 'Electronics', 'is_active' => true]);
@@ -39,12 +45,13 @@ class ODataQueryBuilderTest extends TestCase
         Review::create(['product_id' => $milk->id, 'author' => 'Alice', 'rating' => 5, 'body' => 'Fresh!']);
     }
 
+    /**
+     * Create a GET request with the given OData query string.
+     */
     private function makeRequest(string $queryString): Request
     {
         return Request::create('/products?' . $queryString, 'GET', server: ['QUERY_STRING' => $queryString]);
     }
-
-    // ── $filter ──────────────────────────────────────────────────────
 
     #[Test]
     public function it_filters_by_equality(): void
@@ -71,6 +78,9 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertCount(2, $results);
     }
 
+    /**
+     * Expects Milk (2.99) and Cheese (5.49).
+     */
     #[Test]
     public function it_filters_with_and(): void
     {
@@ -80,7 +90,7 @@ class ODataQueryBuilderTest extends TestCase
             ->allowedFilters('price')
             ->get();
 
-        $this->assertCount(2, $results); // Milk (2.99) and Cheese (5.49)
+        $this->assertCount(2, $results);
     }
 
     #[Test]
@@ -121,6 +131,9 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertSame('Cheese', $results->first()->name);
     }
 
+    /**
+     * All seeded products have descriptions, so filtering for null returns none.
+     */
     #[Test]
     public function it_filters_null(): void
     {
@@ -130,7 +143,7 @@ class ODataQueryBuilderTest extends TestCase
             ->allowedFilters('description')
             ->get();
 
-        $this->assertCount(0, $results); // All products have descriptions in our seed
+        $this->assertCount(0, $results);
     }
 
     #[Test]
@@ -158,8 +171,9 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertCount(2, $results);
     }
 
-    // ── $select ──────────────────────────────────────────────────────
-
+    /**
+     * Description should not be loaded when only Name and Price are selected.
+     */
     #[Test]
     public function it_selects_specific_columns(): void
     {
@@ -172,7 +186,6 @@ class ODataQueryBuilderTest extends TestCase
         $first = $results->first();
         $this->assertNotNull($first->name);
         $this->assertNotNull($first->price);
-        // description should not be loaded
         $this->assertNull($first->description);
     }
 
@@ -188,6 +201,9 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertNotNull($results->first()->id);
     }
 
+    /**
+     * Wildcard means all columns, so description should also be loaded.
+     */
     #[Test]
     public function it_handles_wildcard_select(): void
     {
@@ -197,11 +213,8 @@ class ODataQueryBuilderTest extends TestCase
             ->allowedSelects('id', 'name', 'price')
             ->get();
 
-        // Wildcard means all columns, so description should also be loaded
         $this->assertNotNull($results->first()->description);
     }
-
-    // ── $expand ──────────────────────────────────────────────────────
 
     #[Test]
     public function it_expands_relationships(): void
@@ -229,6 +242,9 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertTrue($results->first()->relationLoaded('reviews'));
     }
 
+    /**
+     * Only the 5-star review should be loaded for the Laptop.
+     */
     #[Test]
     public function it_expands_with_nested_filter(): void
     {
@@ -241,7 +257,6 @@ class ODataQueryBuilderTest extends TestCase
 
         $laptop = $results->firstWhere('name', 'Laptop');
         $this->assertTrue($laptop->relationLoaded('reviews'));
-        // Only the 5-star review should be loaded
         $this->assertCount(1, $laptop->reviews);
         $this->assertSame(5, $laptop->reviews->first()->rating);
     }
@@ -258,8 +273,6 @@ class ODataQueryBuilderTest extends TestCase
         $laptop = $results->firstWhere('name', 'Laptop');
         $this->assertCount(1, $laptop->reviews);
     }
-
-    // ── $orderby ─────────────────────────────────────────────────────
 
     #[Test]
     public function it_orders_ascending(): void
@@ -285,6 +298,9 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertSame('Laptop', $results->first()->name);
     }
 
+    /**
+     * Active products appear first, ordered by price ascending within each group.
+     */
     #[Test]
     public function it_orders_by_multiple_columns(): void
     {
@@ -294,11 +310,8 @@ class ODataQueryBuilderTest extends TestCase
             ->allowedSorts('is_active', 'price')
             ->get();
 
-        // Active products first, ordered by price ascending
         $this->assertTrue((bool) $results->first()->is_active);
     }
-
-    // ── $top and $skip ───────────────────────────────────────────────
 
     #[Test]
     public function it_applies_top(): void
@@ -311,6 +324,9 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertCount(2, $results);
     }
 
+    /**
+     * Skips first 2 (Cheese, Laptop), should start with Milk.
+     */
     #[Test]
     public function it_applies_skip(): void
     {
@@ -321,11 +337,8 @@ class ODataQueryBuilderTest extends TestCase
             ->get();
 
         $this->assertCount(2, $results);
-        // Skipped first 2 (Cheese, Laptop), should start with Milk
         $this->assertSame('Milk', $results->first()->name);
     }
-
-    // ── $count ───────────────────────────────────────────────────────
 
     #[Test]
     public function it_returns_odata_response_with_count(): void
@@ -339,8 +352,6 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertSame(5, $array['meta']['total']);
         $this->assertCount(2, $array['data']);
     }
-
-    // ── PascalCase to snake_case conversion ──────────────────────────
 
     #[Test]
     public function it_converts_pascal_case_filter_properties(): void
@@ -390,8 +401,6 @@ class ODataQueryBuilderTest extends TestCase
 
         $this->assertTrue($results->first()->relationLoaded('category'));
     }
-
-    // ── Security: allowlist validation ────────────────────────────────
 
     #[Test]
     public function it_throws_on_disallowed_filter(): void
@@ -474,6 +483,9 @@ class ODataQueryBuilderTest extends TestCase
             ->get();
     }
 
+    /**
+     * Invalid options should be silently ignored instead of throwing.
+     */
     #[Test]
     public function it_silently_ignores_when_configured(): void
     {
@@ -481,7 +493,6 @@ class ODataQueryBuilderTest extends TestCase
 
         $request = $this->makeRequest('$filter=Description eq \'secret\'&$orderby=Description asc&$select=Description');
 
-        // Should not throw — just ignores invalid options
         $results = ODataQueryBuilder::for(Product::class, $request)
             ->allowedFilters('name')
             ->allowedSorts('name')
@@ -490,8 +501,6 @@ class ODataQueryBuilderTest extends TestCase
 
         $this->assertCount(5, $results);
     }
-
-    // ── Combined query ───────────────────────────────────────────────
 
     #[Test]
     public function it_handles_combined_query(): void
@@ -516,8 +525,6 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertTrue($results->first()->relationLoaded('category'));
     }
 
-    // ── toBuilder ────────────────────────────────────────────────────
-
     #[Test]
     public function it_returns_builder_for_further_customization(): void
     {
@@ -527,13 +534,10 @@ class ODataQueryBuilderTest extends TestCase
             ->allowedFilters('price')
             ->toBuilder();
 
-        // Further customize
         $results = $builder->where('is_active', true)->get();
 
         $this->assertCount(2, $results);
     }
-
-    // ── OData response format ────────────────────────────────────────
 
     #[Test]
     public function it_returns_odata_format_when_configured(): void
@@ -552,14 +556,11 @@ class ODataQueryBuilderTest extends TestCase
         $this->assertCount(2, $array['value']);
     }
 
-    // ── No allowlist = no restrictions ────────────────────────────────
-
     #[Test]
     public function it_allows_everything_when_no_allowlist_set(): void
     {
         $request = $this->makeRequest('$filter=Price gt 100&$orderby=Name asc&$select=Name');
 
-        // No allowedFilters/allowedSorts/etc. called
         $results = ODataQueryBuilder::for(Product::class, $request)
             ->get();
 

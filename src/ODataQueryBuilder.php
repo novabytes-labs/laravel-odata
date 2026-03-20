@@ -165,6 +165,9 @@ class ODataQueryBuilder
         return $this->builder;
     }
 
+    /**
+     * Apply the $filter query option to the builder.
+     */
     private function applyFilter(): void
     {
         if ($this->queryOptions->filter === null) {
@@ -172,13 +175,16 @@ class ODataQueryBuilder
         }
 
         if ($this->allowedFilters !== null && !$this->validateFilterColumns($this->queryOptions->filter)) {
-            return; // Contains invalid columns and throw_on_invalid is false — skip filter
+            return;
         }
 
         $visitor = new EloquentFilterVisitor($this->builder, $this->allowedFilters ?? []);
         $visitor->apply($this->queryOptions->filter);
     }
 
+    /**
+     * Apply the $select query option to the builder.
+     */
     private function applySelect(): void
     {
         if ($this->queryOptions->select === null) {
@@ -189,7 +195,6 @@ class ODataQueryBuilder
 
         foreach ($this->queryOptions->select as $item) {
             if ($item->isWildcard) {
-                // * means all columns — just don't apply select
                 return;
             }
 
@@ -207,7 +212,6 @@ class ODataQueryBuilder
         }
 
         if (!empty($columns)) {
-            // Always include the primary key for relationship loading
             $primaryKey = $this->builder->getModel()->getKeyName();
             if (!in_array($primaryKey, $columns, true)) {
                 array_unshift($columns, $primaryKey);
@@ -217,6 +221,9 @@ class ODataQueryBuilder
         }
     }
 
+    /**
+     * Apply the $expand query option to eager-load relationships.
+     */
     private function applyExpand(): void
     {
         if ($this->queryOptions->expand === null) {
@@ -227,7 +234,7 @@ class ODataQueryBuilder
 
         foreach ($this->queryOptions->expand as $expandItem) {
             if ($expandItem->isWildcard) {
-                continue; // Wildcard expand not supported for Eloquent
+                continue;
             }
 
             $relation = $this->expandItemToRelation($expandItem);
@@ -263,11 +270,13 @@ class ODataQueryBuilder
         }
     }
 
+    /**
+     * Apply nested query options ($filter, $select, $orderby, $top, $skip) to an expanded relationship.
+     */
     private function applyNestedOptions(Builder|\Illuminate\Database\Eloquent\Relations\Relation $query, QueryOptions $options): void
     {
         if ($options->filter !== null) {
             $builder = $query instanceof Builder ? $query : $query->getQuery();
-            // For relations, we need the Eloquent builder
             if ($query instanceof \Illuminate\Database\Eloquent\Relations\Relation) {
                 $eloquentBuilder = $query->getQuery();
             } else {
@@ -308,6 +317,9 @@ class ODataQueryBuilder
         }
     }
 
+    /**
+     * Apply the $orderby query option to the builder.
+     */
     private function applyOrderBy(): void
     {
         if ($this->queryOptions->orderby === null) {
@@ -330,6 +342,9 @@ class ODataQueryBuilder
         }
     }
 
+    /**
+     * Resolve the effective $top value, applying max_top and default_top config.
+     */
     private function resolveTop(): ?int
     {
         $top = $this->queryOptions->top ?? $this->defaultTop;
@@ -345,6 +360,9 @@ class ODataQueryBuilder
         return $top;
     }
 
+    /**
+     * Execute the query with pagination and wrap in an ODataResponse.
+     */
     private function executeWithPagination(?int $top, ?int $skip): ODataResponse
     {
         $perPage = $top ?? $this->defaultTop ?? 15;
@@ -405,20 +423,28 @@ class ODataQueryBuilder
             return true;
         }
 
-        // Literals, lists — no columns to validate
         return true;
     }
 
+    /**
+     * Convert a SelectItem to a snake_case column name.
+     */
     private function selectItemToColumn(SelectItem $item): string
     {
         return implode('.', array_map(CaseConverter::toSnakeCase(...), $item->path));
     }
 
+    /**
+     * Convert an ExpandItem to a camelCase relationship name.
+     */
     private function expandItemToRelation(ExpandItem $item): string
     {
         return implode('.', array_map(CaseConverter::toCamelCase(...), $item->path));
     }
 
+    /**
+     * Convert an OrderByItem to a snake_case column name.
+     */
     private function orderByItemToColumn(OrderByItem $item): string
     {
         if ($item->expression instanceof PropertyPath) {

@@ -50,9 +50,11 @@ class EloquentFilterVisitor implements ExpressionVisitor
         };
     }
 
+    /**
+     * Apply a binary expression (AND/OR, In, comparison, or function call comparison).
+     */
     private function applyBinary(Builder $builder, BinaryExpression $expr): void
     {
-        // Logical operators: AND/OR create nested where groups
         if ($expr->operator === BinaryOperator::And) {
             $builder->where(function (Builder $q) use ($expr) {
                 $this->applyExpression($q, $expr->left);
@@ -75,7 +77,6 @@ class EloquentFilterVisitor implements ExpressionVisitor
             return;
         }
 
-        // In operator: Property in (list)
         if ($expr->operator === BinaryOperator::In && $expr->left instanceof PropertyPath && $expr->right instanceof ListExpression) {
             $column = $this->resolveColumn($expr->left);
             $values = array_map(fn(Expression $item) => $this->resolveValue($item), $expr->right->items);
@@ -84,7 +85,6 @@ class EloquentFilterVisitor implements ExpressionVisitor
             return;
         }
 
-        // Simple comparison: Property op Value
         if ($expr->left instanceof PropertyPath && $expr->right instanceof Literal) {
             $column = $this->resolveColumn($expr->left);
             $value = $expr->right->value;
@@ -101,7 +101,6 @@ class EloquentFilterVisitor implements ExpressionVisitor
             return;
         }
 
-        // Function call on left side: e.g. length(Name) gt 5
         if ($expr->left instanceof FunctionCall && $expr->right instanceof Literal) {
             $sql = $this->functionToSql($expr->left);
             $operator = $this->mapComparisonOperator($expr->operator);
@@ -110,7 +109,6 @@ class EloquentFilterVisitor implements ExpressionVisitor
             return;
         }
 
-        // Reverse: Value op Property
         if ($expr->left instanceof Literal && $expr->right instanceof PropertyPath) {
             $column = $this->resolveColumn($expr->right);
             $value = $expr->left->value;
@@ -125,6 +123,9 @@ class EloquentFilterVisitor implements ExpressionVisitor
         );
     }
 
+    /**
+     * Apply a unary expression (NOT) to the builder.
+     */
     private function applyUnary(Builder $builder, UnaryExpression $expr): void
     {
         if ($expr->operator === UnaryOperator::Not) {
@@ -152,6 +153,9 @@ class EloquentFilterVisitor implements ExpressionVisitor
         };
     }
 
+    /**
+     * Apply a LIKE condition for string functions (contains, startswith, endswith).
+     */
     private function applyLikeFunction(Builder $builder, FunctionCall $expr, string $prefix, string $suffix): void
     {
         $column = $this->resolveColumn($expr->arguments[0]);
@@ -159,6 +163,13 @@ class EloquentFilterVisitor implements ExpressionVisitor
         $builder->where($column, 'LIKE', $prefix . $value . $suffix);
     }
 
+    /**
+     * Apply a lambda expression (any/all) as a relationship existence query.
+     *
+     * any() without predicate checks for at least one related record.
+     * any(d: predicate) applies whereHas with the predicate condition.
+     * all(d: predicate) uses whereDoesntHave with the negated predicate.
+     */
     private function applyLambda(Builder $builder, LambdaExpression $expr): void
     {
         if (!$expr->collection instanceof PropertyPath) {
@@ -169,10 +180,8 @@ class EloquentFilterVisitor implements ExpressionVisitor
 
         if ($expr->operator === LambdaOperator::Any) {
             if ($expr->predicate === null) {
-                // any() without predicate: has at least one related record
                 $builder->has($relation);
             } else {
-                // any(d: d/Qty gt 100): whereHas with condition
                 $builder->whereHas($relation, function (Builder $q) use ($expr) {
                     $innerVisitor = new self($q, $this->allowedFilters);
                     $innerExpr = $this->rewriteLambdaBody($expr->predicate, $expr->variable);
@@ -184,8 +193,6 @@ class EloquentFilterVisitor implements ExpressionVisitor
         }
 
         if ($expr->operator === LambdaOperator::All) {
-            // all(d: d/Qty gt 0): every related record must match
-            // Equivalent to: NOT EXISTS (related WHERE NOT condition)
             $builder->whereDoesntHave($relation, function (Builder $q) use ($expr) {
                 $negated = new UnaryExpression(UnaryOperator::Not, $expr->predicate);
                 $innerVisitor = new self($q, $this->allowedFilters);
@@ -270,25 +277,30 @@ class EloquentFilterVisitor implements ExpressionVisitor
         };
     }
 
+    /**
+     * Resolve a PropertyPath expression to a snake_case column name.
+     *
+     * Single segment paths resolve to a direct column name.
+     * Multi-segment paths resolve to dot-notation for relationship columns.
+     */
     private function resolveColumn(Expression $expr): string
     {
         if (!$expr instanceof PropertyPath) {
             throw new \InvalidArgumentException('Expected property path, got: ' . get_class($expr));
         }
 
-        // Convert each segment from PascalCase to snake_case
         $segments = array_map(CaseConverter::toSnakeCase(...), $expr->segments);
 
-        // Single segment = direct column
         if (count($segments) === 1) {
             return $segments[0];
         }
 
-        // Multi-segment = relationship column (e.g. Address/City → address.city)
-        // For SQL, we use the last segment as the column name
         return implode('.', $segments);
     }
 
+    /**
+     * Resolve a PropertyPath to a camelCase relationship name.
+     */
     private function resolveRelation(PropertyPath $path): string
     {
         $segments = array_map(CaseConverter::toCamelCase(...), $path->segments);
@@ -296,6 +308,9 @@ class EloquentFilterVisitor implements ExpressionVisitor
         return implode('.', $segments);
     }
 
+    /**
+     * Resolve an expression to its PHP value.
+     */
     private function resolveValue(Expression $expr): mixed
     {
         if ($expr instanceof Literal) {
@@ -309,6 +324,9 @@ class EloquentFilterVisitor implements ExpressionVisitor
         throw new \InvalidArgumentException('Cannot resolve value from: ' . get_class($expr));
     }
 
+    /**
+     * Map an OData binary operator to its SQL equivalent.
+     */
     private function mapComparisonOperator(BinaryOperator $op): string
     {
         return match ($op) {
@@ -322,6 +340,9 @@ class EloquentFilterVisitor implements ExpressionVisitor
         };
     }
 
+    /**
+     * Flip a comparison operator for reversed operand order.
+     */
     private function flipOperator(BinaryOperator $op): BinaryOperator
     {
         return match ($op) {
@@ -333,8 +354,9 @@ class EloquentFilterVisitor implements ExpressionVisitor
         };
     }
 
-    // ExpressionVisitor interface — not used directly, but available for custom visitors
-
+    /**
+     * {@inheritdoc}
+     */
     public function visitBinaryExpression(BinaryExpression $expr): mixed
     {
         $this->applyBinary($this->builder, $expr);
@@ -342,6 +364,9 @@ class EloquentFilterVisitor implements ExpressionVisitor
         return $this->builder;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function visitUnaryExpression(UnaryExpression $expr): mixed
     {
         $this->applyUnary($this->builder, $expr);
@@ -349,16 +374,25 @@ class EloquentFilterVisitor implements ExpressionVisitor
         return $this->builder;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function visitPropertyPath(PropertyPath $expr): mixed
     {
         return $this->resolveColumn($expr);
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function visitLiteral(Literal $expr): mixed
     {
         return $expr->value;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function visitFunctionCall(FunctionCall $expr): mixed
     {
         $this->applyFunctionAsCondition($this->builder, $expr);
@@ -366,6 +400,9 @@ class EloquentFilterVisitor implements ExpressionVisitor
         return $this->builder;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function visitLambdaExpression(LambdaExpression $expr): mixed
     {
         $this->applyLambda($this->builder, $expr);
@@ -373,6 +410,9 @@ class EloquentFilterVisitor implements ExpressionVisitor
         return $this->builder;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function visitListExpression(ListExpression $expr): mixed
     {
         return array_map(fn(Expression $item) => $this->resolveValue($item), $expr->items);
