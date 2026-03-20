@@ -1,0 +1,44 @@
+{
+    "name": "novabytes/laravel-odata",
+    "description": "Apply OData 4 query options to Eloquent models. Supports $filter, $select, $expand, $orderby, $top, $skip, and $count.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "odata",
+        "laravel",
+        "eloquent",
+        "query",
+        "filter",
+        "api"
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": "^8.2",
+        "novabytes/odata-query-parser": "dev-master",
+        "illuminate/database": "^11.0|^12.0|^13.0",
+        "illuminate/http": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0",
+        "orchestra/testbench": "^9.0|^10.0|^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "NovaBytes\\OData\\Laravel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "NovaBytes\\OData\\Laravel\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "NovaBytes\\OData\\Laravel\\ODataServiceProvider"
+            ]
+        }
+    }
+}
