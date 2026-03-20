@@ -1,5 +1,10 @@
 # Laravel OData
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/novabytes/laravel-odata.svg)](https://packagist.org/packages/novabytes/laravel-odata)
+![Test Status](https://img.shields.io/github/actions/workflow/status/novabytes-labs/laravel-odata/ci.yml?label=tests&branch=master)
+![Code Style Status](https://img.shields.io/github/actions/workflow/status/novabytes-labs/laravel-odata/ci.yml?label=code%20style&branch=master)
+[![Total Downloads](https://img.shields.io/packagist/dt/novabytes/laravel-odata.svg)](https://packagist.org/packages/novabytes/laravel-odata)
+
 Apply OData 4 query options to Eloquent models. Supports `$filter`, `$select`, `$expand`, `$orderby`, `$top`, `$skip`, and `$count`.
 
 Built on top of [novabytes/odata-query-parser](https://github.com/novabytes-labs/laravel-odata).
