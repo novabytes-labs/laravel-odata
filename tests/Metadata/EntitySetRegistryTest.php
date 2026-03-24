@@ -47,4 +47,33 @@ class EntitySetRegistryTest extends TestCase
         $this->assertArrayHasKey(Product::class, $all);
         $this->assertArrayHasKey(Category::class, $all);
     }
+
+    #[Test]
+    public function it_caches_resolved_entity_types_on_repeated_calls(): void
+    {
+        $registry = new EntitySetRegistry();
+        $registry->register(Product::class, [
+            'allowedFilters' => ['name'],
+        ]);
+
+        $first = $registry->get(Product::class);
+        $second = $registry->get(Product::class);
+
+        $this->assertSame($first, $second);
+    }
+
+    #[Test]
+    public function it_re_resolves_after_new_registration(): void
+    {
+        $registry = new EntitySetRegistry();
+        $registry->register(Product::class, []);
+
+        $allBefore = $registry->all();
+        $this->assertCount(1, $allBefore);
+
+        $registry->register(Category::class, []);
+
+        $allAfter = $registry->all();
+        $this->assertCount(2, $allAfter);
+    }
 }

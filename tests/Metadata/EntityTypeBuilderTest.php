@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace NovaBytes\OData\Laravel\Tests\Metadata;
 
 use NovaBytes\OData\Laravel\Metadata\EntityTypeBuilder;
+use NovaBytes\OData\Laravel\Tests\Models\ModelWithMixedMethods;
 use NovaBytes\OData\Laravel\Tests\Models\Product;
 use NovaBytes\OData\Laravel\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
@@ -131,5 +132,20 @@ class EntityTypeBuilderTest extends TestCase
         }
 
         $this->fail("Navigation property '{$name}' not found.");
+    }
+
+    /**
+     * Model methods with parameters, no return type, or non-Relation return types
+     * should be skipped when building navigation properties.
+     */
+    #[Test]
+    public function it_skips_non_relation_methods_when_building_navigation_properties(): void
+    {
+        $entityType = EntityTypeBuilder::build(ModelWithMixedMethods::class, [
+            'allowedExpands' => ['reviews', 'findByName', 'noReturnType', 'formattedPrice'],
+        ]);
+
+        $this->assertCount(1, $entityType->navigationProperties);
+        $this->assertSame('Reviews', $entityType->navigationProperties[0]->name);
     }
 }

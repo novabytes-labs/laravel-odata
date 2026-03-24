@@ -839,4 +839,189 @@ class ODataQueryBuilderTest extends TestCase
 
         $this->assertCount(5, $results);
     }
+
+    #[Test]
+    public function it_returns_builder_with_top_and_skip_applied(): void
+    {
+        $request = $this->makeRequest('$orderby=Name asc&$top=2&$skip=1');
+
+        $builder = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedSorts('name')
+            ->toBuilder();
+
+        $this->assertInstanceOf(\Illuminate\Database\Eloquent\Builder::class, $builder);
+
+        $results = $builder->get();
+        $this->assertCount(2, $results);
+        $this->assertSame('Laptop', $results->first()->name);
+    }
+
+    #[Test]
+    public function it_silently_ignores_expand_depth_exceeded(): void
+    {
+        $this->app['config']->set('odata.max_expand_depth', 1);
+        $this->app['config']->set('odata.throw_on_invalid', false);
+
+        $request = $this->makeRequest('$expand=Category/Products');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedExpands('category', 'category.products')
+            ->get();
+
+        $this->assertCount(5, $results);
+    }
+
+    #[Test]
+    public function it_silently_ignores_disallowed_select(): void
+    {
+        $this->app['config']->set('odata.throw_on_invalid', false);
+
+        $request = $this->makeRequest('$select=Name,Description');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedSelects('id', 'name')
+            ->get();
+
+        $first = $results->first();
+        $this->assertNotNull($first->name);
+        $this->assertNull($first->description);
+    }
+
+    #[Test]
+    public function it_silently_caps_top_and_returns_paginated_with_count(): void
+    {
+        $this->app['config']->set('odata.max_top', 2);
+        $this->app['config']->set('odata.throw_on_invalid', false);
+
+        $request = $this->makeRequest('$count=true&$top=100');
+
+        $response = ODataQueryBuilder::for(Product::class, $request)
+            ->get();
+
+        $array = $response->toArray();
+        $this->assertSame(5, $array['meta']['total']);
+        $this->assertCount(2, $array['data']);
+    }
+
+    #[Test]
+    public function it_expands_with_nested_wildcard_select(): void
+    {
+        $request = $this->makeRequest('$expand=Reviews($select=*)');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedExpands('reviews')
+            ->get();
+
+        $laptop = $results->firstWhere('name', 'Laptop');
+        $this->assertTrue($laptop->relationLoaded('reviews'));
+        $this->assertNotNull($laptop->reviews->first()->body);
+    }
+
+    #[Test]
+    public function it_returns_odata_format_without_explicit_count(): void
+    {
+        $this->app['config']->set('odata.response_format', 'odata');
+
+        $request = $this->makeRequest('$top=2');
+
+        $response = ODataQueryBuilder::for(Product::class, $request)
+            ->get();
+
+        $array = $response->toArray();
+        $this->assertArrayHasKey('value', $array);
+        $this->assertArrayNotHasKey('@odata.count', $array);
+        $this->assertCount(2, $array['value']);
+    }
+
+    #[Test]
+    public function it_applies_filter_without_allowlist(): void
+    {
+        $request = $this->makeRequest('$filter=Price gt 100');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->get();
+
+        $this->assertCount(2, $results);
+    }
+
+    #[Test]
+    public function it_silently_ignores_disallowed_sort(): void
+    {
+        $this->app['config']->set('odata.throw_on_invalid', false);
+
+        $request = $this->makeRequest('$orderby=Description asc');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedSorts('name')
+            ->get();
+
+        $this->assertCount(5, $results);
+    }
+
+    #[Test]
+    public function it_uses_default_top_for_pagination_when_no_top_set(): void
+    {
+        $this->app['config']->set('odata.default_top', 3);
+
+        $request = $this->makeRequest('$count=true');
+
+        $response = ODataQueryBuilder::for(Product::class, $request)
+            ->get();
+
+        $array = $response->toArray();
+        $this->assertSame(5, $array['meta']['total']);
+        $this->assertCount(3, $array['data']);
+    }
+
+    #[Test]
+    public function it_validates_filter_columns_in_function_calls(): void
+    {
+        $request = $this->makeRequest('$filter=contains(Description,\'secret\')');
+
+        $this->expectException(InvalidQueryException::class);
+        $this->expectExceptionMessage('Filter \'description\' is not allowed');
+
+        ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('name')
+            ->get();
+    }
+
+    #[Test]
+    public function it_validates_filter_columns_in_unary_expressions(): void
+    {
+        $request = $this->makeRequest('$filter=not (Description eq \'secret\')');
+
+        $this->expectException(InvalidQueryException::class);
+        $this->expectExceptionMessage('Filter \'description\' is not allowed');
+
+        ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('name')
+            ->get();
+    }
+
+    #[Test]
+    public function it_silently_ignores_disallowed_filter_columns(): void
+    {
+        $this->app['config']->set('odata.throw_on_invalid', false);
+
+        $request = $this->makeRequest('$filter=contains(Description,\'secret\')');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('name')
+            ->get();
+
+        $this->assertCount(5, $results);
+    }
+
+    #[Test]
+    public function it_validates_lambda_filter_without_predicate(): void
+    {
+        $request = $this->makeRequest('$filter=Reviews/any()');
+
+        $results = ODataQueryBuilder::for(Product::class, $request)
+            ->allowedFilters('name')
+            ->get();
+
+        $this->assertCount(3, $results);
+    }
 }
