@@ -39,4 +39,22 @@ class CaseConverter
     {
         return lcfirst($value);
     }
+
+    /**
+     * Convert a snake_case string to PascalCase.
+     *
+     * Examples:
+     *   'category_id' → 'CategoryId'
+     *   'name'        → 'Name'
+     *   'is_active'   → 'IsActive'
+     *   'Name'        → 'Name'
+     */
+    public static function toPascalCase(string $value): string
+    {
+        if (!str_contains($value, '_') && $value !== strtolower($value)) {
+            return ucfirst($value);
+        }
+
+        return str_replace('_', '', ucwords($value, '_'));
+    }
 }

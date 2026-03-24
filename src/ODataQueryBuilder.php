@@ -24,6 +24,9 @@ class ODataQueryBuilder
     private Builder $builder;
     private QueryOptions $queryOptions;
 
+    /** @var class-string<Model>|null */
+    private ?string $modelClass = null;
+
     /** @var list<string>|null */
     private ?array $allowedFilters = null;
 
@@ -55,9 +58,13 @@ class ODataQueryBuilder
      */
     public function __construct(string|Builder $subject, Request $request)
     {
-        $this->builder = $subject instanceof Builder
-            ? $subject
-            : $subject::query();
+        if (is_string($subject)) {
+            $this->modelClass = $subject;
+            $this->builder = $subject::query();
+        } else {
+            $this->modelClass = get_class($subject->getModel());
+            $this->builder = $subject;
+        }
 
         $queryString = $request->server->get('QUERY_STRING', '');
         $this->queryOptions = QueryOptionParser::parse($queryString);
@@ -117,6 +124,7 @@ class ODataQueryBuilder
      */
     public function get(): ODataResponse|Collection
     {
+        $this->resolveAllowlistsFromConfig();
         $this->applyFilter();
         $this->applySelect();
         $this->applyExpand();
@@ -145,6 +153,7 @@ class ODataQueryBuilder
      */
     public function toBuilder(): Builder
     {
+        $this->resolveAllowlistsFromConfig();
         $this->applyFilter();
         $this->applySelect();
         $this->applyExpand();
@@ -162,6 +171,27 @@ class ODataQueryBuilder
         }
 
         return $this->builder;
+    }
+
+    /**
+     * Populate allowlists from config when not explicitly set via fluent methods.
+     */
+    private function resolveAllowlistsFromConfig(): void
+    {
+        if ($this->modelClass === null) {
+            return;
+        }
+
+        $config = config("odata.entity_sets.{$this->modelClass}");
+
+        if ($config === null) {
+            return;
+        }
+
+        $this->allowedFilters ??= $config['allowedFilters'] ?? null;
+        $this->allowedSorts ??= $config['allowedSorts'] ?? null;
+        $this->allowedExpands ??= $config['allowedExpands'] ?? null;
+        $this->allowedSelects ??= $config['allowedSelects'] ?? null;
     }
 
     /**
