@@ -27,4 +27,14 @@ class CaseConverterTest extends TestCase
         $this->assertSame('already_snake', CaseConverter::toSnakeCase('already_snake'));
         $this->assertSame('lowercase', CaseConverter::toSnakeCase('lowercase'));
     }
+
+    #[Test]
+    public function it_converts_to_pascal_case(): void
+    {
+        $this->assertSame('CategoryId', CaseConverter::toPascalCase('category_id'));
+        $this->assertSame('Name', CaseConverter::toPascalCase('name'));
+        $this->assertSame('IsActive', CaseConverter::toPascalCase('is_active'));
+        $this->assertSame('Name', CaseConverter::toPascalCase('Name'));
+        $this->assertSame('Id', CaseConverter::toPascalCase('id'));
+    }
 }

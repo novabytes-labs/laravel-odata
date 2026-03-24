@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
 
     /*
@@ -60,5 +62,56 @@ return [
     |
     */
     'throw_on_invalid' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Entity Sets
+    |--------------------------------------------------------------------------
+    |
+    | Register Eloquent models as OData entity sets. Each entry defines the
+    | model class and its allowed query capabilities. These are used by
+    | both the $metadata / OpenAPI endpoints and as default allowlists
+    | for ODataQueryBuilder (controllers can still override per-endpoint).
+    |
+    | Example:
+    |   \App\Models\Product::class => [
+    |       'entitySet'      => 'Products',
+    |       'allowedFilters'  => ['name', 'price', 'is_active'],
+    |       'allowedSorts'    => ['name', 'price', 'created_at'],
+    |       'allowedExpands'  => ['category', 'reviews'],
+    |       'allowedSelects'  => ['id', 'name', 'price', 'description'],
+    |   ],
+    |
+    */
+    'entity_sets' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Schema Namespace
+    |--------------------------------------------------------------------------
+    |
+    | The namespace used in the OData CSDL metadata document.
+    |
+    */
+    'namespace' => 'Default',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Metadata Endpoints
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, registers routes for OData $metadata (CSDL XML) and
+    | OpenAPI (JSON) documentation, auto-generated from entity_sets.
+    |
+    */
+    'metadata' => [
+        'enabled' => false,
+        'route_prefix' => 'api',
+        'openapi' => [
+            'title' => 'OData API',
+            'version' => '1.0.0',
+            'description' => '',
+        ],
+    ],
 
 ];
