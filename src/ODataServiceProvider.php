@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use NovaBytes\OData\Laravel\Http\Controllers\MetadataController;
 use NovaBytes\OData\Laravel\Http\Controllers\OpenApiController;
+use NovaBytes\OData\Laravel\Http\ODataRouteRegistrar;
 use NovaBytes\OData\Laravel\Metadata\EntitySetRegistry;
 
 class ODataServiceProvider extends ServiceProvider
@@ -20,10 +21,12 @@ class ODataServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__ . '/../config/odata.php', 'odata');
 
         $this->app->singleton(EntitySetRegistry::class);
+        $this->app->singleton(EntitySetResolver::class);
+        $this->app->singleton(ODataCrudHandler::class);
     }
 
     /**
-     * Boot the OData services: publish config, register entity sets, and register metadata routes.
+     * Boot the OData services: publish config, register entity sets, and register routes.
      */
     public function boot(): void
     {
@@ -33,10 +36,11 @@ class ODataServiceProvider extends ServiceProvider
 
         $this->registerEntitySets();
         $this->registerMetadataRoutes();
+        $this->registerCrudRoutes();
     }
 
     /**
-     * Register entity set configurations into the registry for lazy building.
+     * Register entity set configurations into the registry and resolver for lazy building.
      */
     private function registerEntitySets(): void
     {
@@ -47,9 +51,11 @@ class ODataServiceProvider extends ServiceProvider
         }
 
         $registry = $this->app->make(EntitySetRegistry::class);
+        $resolver = $this->app->make(EntitySetResolver::class);
 
         foreach ($entitySets as $modelClass => $config) {
             $registry->register($modelClass, $config);
+            $resolver->register($modelClass, $config);
         }
     }
 
@@ -66,5 +72,19 @@ class ODataServiceProvider extends ServiceProvider
 
         Route::get("{$prefix}/\$metadata", MetadataController::class);
         Route::get("{$prefix}/openapi.json", OpenApiController::class);
+    }
+
+    /**
+     * Register CRUD routes for entity sets when CRUD is enabled.
+     */
+    private function registerCrudRoutes(): void
+    {
+        if (!config('odata.crud.enabled', false)) {
+            return;
+        }
+
+        $resolver = $this->app->make(EntitySetResolver::class);
+
+        ODataRouteRegistrar::register($resolver);
     }
 }

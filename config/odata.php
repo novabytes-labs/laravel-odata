@@ -75,11 +75,14 @@ return [
     |
     | Example:
     |   \App\Models\Product::class => [
-    |       'entitySet'      => 'Products',
+    |       'entitySet'       => 'Products',
+    |       'operations'      => ['read', 'create', 'update', 'delete'],
     |       'allowedFilters'  => ['name', 'price', 'is_active'],
     |       'allowedSorts'    => ['name', 'price', 'created_at'],
     |       'allowedExpands'  => ['category', 'reviews'],
     |       'allowedSelects'  => ['id', 'name', 'price', 'description'],
+    |       'allowedCreates'  => ['name', 'price', 'description', 'category_id'],
+    |       'allowedUpdates'  => ['name', 'price', 'description'],
     |   ],
     |
     */
@@ -112,6 +115,23 @@ return [
             'version' => '1.0.0',
             'description' => '',
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | CRUD Endpoints
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, auto-registers CRUD routes for all entity sets that have
+    | operations defined. Each entity set will get routes for the operations
+    | listed in its 'operations' array.
+    |
+    */
+    'crud' => [
+        'enabled' => false,
+        'route_prefix' => 'api',
+        'middleware' => ['api'],
+        'default_operations' => ['read'],
     ],
 
 ];
