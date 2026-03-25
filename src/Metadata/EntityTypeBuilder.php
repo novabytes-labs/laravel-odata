@@ -31,7 +31,7 @@ class EntityTypeBuilder
      * Build an EntityType from a model class and its entity set configuration.
      *
      * @param class-string<Model> $modelClass
-     * @param array{entitySet?: string, allowedFilters?: list<string>, allowedSorts?: list<string>, allowedExpands?: list<string>, allowedSelects?: list<string>} $config
+     * @param array{entitySet?: string, operations?: list<string>, allowedFilters?: list<string>, allowedSorts?: list<string>, allowedExpands?: list<string>, allowedSelects?: list<string>, allowedCreates?: list<string>, allowedUpdates?: list<string>} $config
      */
     public static function build(string $modelClass, array $config = []): EntityType
     {
@@ -46,8 +46,11 @@ class EntityTypeBuilder
         $allowedSorts = $config['allowedSorts'] ?? [];
         $allowedSelects = $config['allowedSelects'] ?? [];
         $allowedExpands = $config['allowedExpands'] ?? [];
+        $allowedCreates = $config['allowedCreates'] ?? [];
+        $allowedUpdates = $config['allowedUpdates'] ?? [];
+        $operations = $config['operations'] ?? config('odata.crud.default_operations', ['read']);
 
-        $properties = self::buildProperties($table, $allowedFilters, $allowedSorts, $allowedSelects);
+        $properties = self::buildProperties($table, $allowedFilters, $allowedSorts, $allowedSelects, $allowedCreates, $allowedUpdates);
         $navigationProperties = self::buildNavigationProperties($model, $allowedExpands);
 
         return new EntityType(
@@ -56,6 +59,7 @@ class EntityTypeBuilder
             keyProperty: $keyPascal,
             properties: $properties,
             navigationProperties: $navigationProperties,
+            operations: $operations,
         );
     }
 
@@ -65,6 +69,8 @@ class EntityTypeBuilder
      * @param list<string> $allowedFilters
      * @param list<string> $allowedSorts
      * @param list<string> $allowedSelects
+     * @param list<string> $allowedCreates
+     * @param list<string> $allowedUpdates
      * @return list<PropertyMetadata>
      */
     private static function buildProperties(
@@ -72,6 +78,8 @@ class EntityTypeBuilder
         array $allowedFilters,
         array $allowedSorts,
         array $allowedSelects,
+        array $allowedCreates,
+        array $allowedUpdates,
     ): array {
         $columns = Schema::getColumns($table);
         $properties = [];
@@ -88,6 +96,8 @@ class EntityTypeBuilder
                 filterable: in_array($name, $allowedFilters, true),
                 sortable: in_array($name, $allowedSorts, true),
                 selectable: in_array($name, $allowedSelects, true),
+                creatable: in_array($name, $allowedCreates, true),
+                updatable: in_array($name, $allowedUpdates, true),
             );
         }
 

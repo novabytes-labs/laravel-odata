@@ -5,7 +5,7 @@
 ![Code Style Status](https://img.shields.io/github/actions/workflow/status/novabytes-labs/laravel-odata/ci.yml?label=code%20style&branch=master)
 [![Total Downloads](https://img.shields.io/packagist/dt/novabytes/laravel-odata.svg)](https://packagist.org/packages/novabytes/laravel-odata)
 
-Apply OData 4 query options to Eloquent models. Supports `$filter`, `$select`, `$expand`, `$orderby`, `$top`, `$skip`, and `$count`.
+OData 4 for Laravel. Query (filter, select, expand, sort, paginate) and CRUD (create, read, update, delete) your Eloquent models via OData-compliant endpoints.
 
 Built on top of [novabytes-labs/odata-query-parser](https://github.com/novabytes-labs/odata-query-parser).
 
@@ -13,6 +13,7 @@ Built on top of [novabytes-labs/odata-query-parser](https://github.com/novabytes
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [CRUD Endpoints](#crud-endpoints)
 - [Query Options](#query-options)
 - [PascalCase Conversion](#pascalcase-conversion)
 - [Security](#security)
@@ -60,6 +61,49 @@ Your API now accepts OData queries:
 GET /products?$filter=Price gt 100&$select=Name,Price&$expand=Category&$orderby=Price desc&$top=50&$skip=10&$count=true
 ```
 
+## CRUD Endpoints
+
+Enable auto-registered CRUD routes for your entity sets:
+
+```php
+// config/odata.php
+
+'entity_sets' => [
+    \App\Models\Product::class => [
+        'entitySet'       => 'Products',
+        'operations'      => ['read', 'create', 'update', 'delete'],
+        'allowedFilters'  => ['name', 'price'],
+        'allowedSorts'    => ['name', 'price'],
+        'allowedExpands'  => ['category'],
+        'allowedSelects'  => ['id', 'name', 'price', 'description'],
+        'allowedCreates'  => ['name', 'price', 'description', 'category_id'],
+        'allowedUpdates'  => ['name', 'price', 'description'],
+    ],
+],
+
+'crud' => [
+    'enabled'            => true,
+    'route_prefix'       => 'api',
+    'middleware'          => ['api'],
+    'default_operations' => ['read'],
+],
+```
+
+This registers the following routes:
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/api/Products` | List with OData query options |
+| `POST` | `/api/Products` | Create entity |
+| `GET` | `/api/Products/{key}` | Get single entity |
+| `PUT` | `/api/Products/{key}` | Full replace |
+| `PATCH` | `/api/Products/{key}` | Partial update |
+| `DELETE` | `/api/Products/{key}` | Delete entity |
+
+Request bodies accept both PascalCase and snake_case field names. Only fields listed in `allowedCreates`/`allowedUpdates` are accepted — others return `400`.
+
+The CSDL and OpenAPI metadata endpoints automatically reflect CRUD capabilities.
+
 ## Query Options
 
 | Option | Example | Description |
@@ -106,12 +150,16 @@ Register your models and their allowlists centrally in `config/odata.php` to ena
 'entity_sets' => [
     \App\Models\Product::class => [
         'entitySet'       => 'Products',           // optional, auto-generated from table name
+        'operations'      => ['read', 'create', 'update', 'delete'],
         'allowedFilters'  => ['name', 'price', 'is_active'],
         'allowedSorts'    => ['name', 'price', 'created_at'],
         'allowedExpands'  => ['category', 'reviews'],
         'allowedSelects'  => ['id', 'name', 'price', 'description'],
+        'allowedCreates'  => ['name', 'price', 'description', 'category_id'],
+        'allowedUpdates'  => ['name', 'price', 'description'],
     ],
     \App\Models\Category::class => [
+        'operations'      => ['read'],
         'allowedFilters'  => ['name'],
         'allowedExpands'  => ['products'],
     ],
@@ -170,6 +218,12 @@ return [
         'enabled'      => false,
         'route_prefix' => 'odata',
         'openapi'      => ['title' => 'OData API', 'version' => '1.0.0', 'description' => ''],
+    ],
+    'crud'             => [           // CRUD endpoint config
+        'enabled'            => false,
+        'route_prefix'       => 'api',
+        'middleware'          => ['api'],
+        'default_operations' => ['read'],
     ],
 ];
 ```
